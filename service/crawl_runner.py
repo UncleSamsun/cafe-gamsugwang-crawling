@@ -26,6 +26,7 @@ def search_cafes(min_lat, min_lng, max_lat, max_lng, api_key, session):
     }
 
     cafe_ids = set()
+    cafe_data = []
     page = 1
 
     while True:
@@ -45,7 +46,7 @@ def search_cafes(min_lat, min_lng, max_lat, max_lng, api_key, session):
             if response.status_code == 401 or response.status_code == 403:
                 print(f"    ⚠️ API 키 인증 오류 (상태 코드: {response.status_code})")
                 print("    💡 새로운 API 키를 발급받아 사용해주세요.")
-                return list(cafe_ids)
+                return cafe_data
 
             response.raise_for_status()
             result = response.json()
@@ -56,8 +57,17 @@ def search_cafes(min_lat, min_lng, max_lat, max_lng, api_key, session):
 
             for doc in documents:
                 place_id = doc.get("id")
-                if place_id:
+                place_name = doc.get("place_name")
+                x = doc.get("x")
+                y = doc.get("y")
+                if place_id and place_name and x and y:
                     cafe_ids.add(place_id)
+                    cafe_data.append({
+                        "id": place_id,
+                        "place_name": place_name,
+                        "x": float(x),
+                        "y": float(y)
+                    })
 
             print(f"    📄 {page}페이지: 총 {len(cafe_ids)}개 수집됨")
 
@@ -75,7 +85,7 @@ def search_cafes(min_lat, min_lng, max_lat, max_lng, api_key, session):
             print(f"    ⚠️ 예상치 못한 오류: {e}")
             break
 
-    return list(cafe_ids)
+    return cafe_data
 
 def save_results(results, filename):
     try:
@@ -85,24 +95,24 @@ def save_results(results, filename):
     except Exception as e:
         print(f"⚠️ 결과 저장 실패: {e}")
 
-def save_cafe_ids(grid_key: str, cafe_ids: list[str]):
-    if not cafe_ids:
+def save_cafe_ids(grid_key: str, cafe_data: list[dict]):
+    if not cafe_data:
         print(f"⚠️ {grid_key} 영역에서 수집된 카페 ID가 없어 저장을 생략합니다.")
         return
 
     conn = get_connection()
     cursor = conn.cursor()
-    for cafe_id in cafe_ids:
+    for cafe in cafe_data:
         try:
             cursor.execute(
-                "INSERT IGNORE INTO cafe_in_grid (grid_key, cafe_id) VALUES (%s, %s)",
-                (grid_key, cafe_id)
+                "INSERT IGNORE INTO cafe_ids (id, place_name, x, y) VALUES (%s, %s, %s, %s)",
+                (cafe["id"], cafe["place_name"], cafe["x"], cafe["y"])
             )
         except Exception as e:
             print(f"❌ DB INSERT 실패: {e}")
     conn.commit()
-    print(f"✅ {grid_key} 저장 완료 ({len(cafe_ids)}개)")
-    cursor.execute("SELECT COUNT(*) AS total FROM cafe_in_grid")
+    print(f"✅ {grid_key} 저장 완료 ({len(cafe_data)}개)")
+    cursor.execute("SELECT COUNT(*) AS total FROM cafe_ids")
     total = cursor.fetchone()["total"]
     print(f"📊 현재까지 저장된 전체 카페 ID 수: {total}")
     cursor.close()
@@ -135,9 +145,9 @@ def main():
             grid_key = f"{min_lat:.6f},{min_lng:.6f},{max_lat:.6f},{max_lng:.6f}"
 
             print(f"\n🔍 검색 중: 셀 {idx + 1}/{len(grid_rects)} ({grid_key})")
-            cafe_ids = search_cafes(min_lat, min_lng, max_lat, max_lng, API_KEY, session)
-            save_cafe_ids(grid_key, cafe_ids)
-            place_ids.update(cafe_ids)
+            cafe_data = search_cafes(min_lat, min_lng, max_lat, max_lng, API_KEY, session)
+            save_cafe_ids(grid_key, cafe_data)
+            place_ids.update([cafe["id"] for cafe in cafe_data])
 
     except Exception as e:
         print(f"⚠️ 실행 중 오류 발생: {e}")
@@ -167,8 +177,8 @@ def run_grid_crawling():
         grid_key = f"{min_lat:.6f},{min_lng:.6f},{max_lat:.6f},{max_lng:.6f}"
 
         print(f"\n🔍 검색 중: 셀 {idx + 1}/{len(grid_rects)} ({grid_key})")
-        cafe_ids = search_cafes(min_lat, min_lng, max_lat, max_lng, API_KEY, session)
-        save_cafe_ids(grid_key, cafe_ids)
-        place_ids.update(cafe_ids)
+        cafe_data = search_cafes(min_lat, min_lng, max_lat, max_lng, API_KEY, session)
+        save_cafe_ids(grid_key, cafe_data)
+        place_ids.update([cafe["id"] for cafe in cafe_data])
 
     return {"saved": len(place_ids)}
