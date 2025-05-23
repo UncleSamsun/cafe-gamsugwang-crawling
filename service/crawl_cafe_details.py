@@ -1,6 +1,6 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -12,11 +12,6 @@ DEFAULT_WAIT = 5
 SHORT_WAIT = 3
 
 def crawl_single_cafe(id):
-    import time
-    import re
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.common.by import By
     options = Options()
     options.add_argument("--headless")
     driver = webdriver.Chrome(options=options)
@@ -206,7 +201,6 @@ def crawl_single_cafe(id):
         return False
 
 def crawl_and_save_all_cafes():
-    start_time = time.time()
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM reviews")
@@ -216,6 +210,7 @@ def crawl_and_save_all_cafes():
     cursor.execute("ALTER TABLE menu AUTO_INCREMENT = 1")
     cursor.execute("ALTER TABLE cafes AUTO_INCREMENT = 1")
     conn.commit()
+    start_time = time.time()
 
     cursor.execute("SELECT DISTINCT id FROM cafe_ids")
     # cursor.execute("SELECT DISTINCT id FROM cafe_ids LIMIT 10")
@@ -250,4 +245,8 @@ def crawl_and_save_all_cafes():
 
     elapsed_time = time.time() - start_time
     print(f"⏱ 크롤링 완료 - 소요 시간: {elapsed_time:.2f}초")
-    return {"crawled_cafes": saved_count}
+    print(f"✅ 저장된 카페 수: {saved_count} / {len(cafe_ids)}")
+    if failed_ids:
+        print("❌ 실패한 카페 ID 목록:")
+        print(", ".join(map(str, failed_ids)))
+    return {"crawled_cafes": saved_count, "failed_ids": failed_ids}
