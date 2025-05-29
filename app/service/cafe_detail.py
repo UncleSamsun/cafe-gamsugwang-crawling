@@ -111,6 +111,10 @@ def crawl_and_save_single_cafe(cafe_id):
         except:
             review_count = 0
 
+        # 평점과 리뷰 수의 일관성 확인
+        if review_count == 0 and rating > 0.0:
+            rating = 0.0
+
         # 메뉴 탭 클릭 및 메뉴 정보 수집
         try:
             menu_tab = driver.find_element(By.LINK_TEXT, "메뉴")

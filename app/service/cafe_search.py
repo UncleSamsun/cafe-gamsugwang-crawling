@@ -187,6 +187,14 @@ def run_grid_crawling():
     session = create_session()
     place_ids = set()
 
+    # cafe_ids 테이블 초기화
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM cafe_ids")
+        print("🔄 cafe_ids 테이블 초기화 완료")
+    conn.commit()
+    conn.close()
+
     grid_rects = pd.read_csv("data/map/grid_jeju_rects_200m_filtered.csv")
     print(f"총 검색할 사각형 영역 수: {len(grid_rects)}")
 
