@@ -1,23 +1,79 @@
-version: "3.8"
-
 services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: es
+    ports:
+      - "9200:9200"
+    mem_limit: 6g
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+    networks:
+      - gsg
+    healthcheck:
+      test: curl -s http://localhost:5601/api/status | grep -q '"state":"green"' || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_BASEPATH=/api/kibana
+      - SERVER_REWRITEBASEPATH=true
+    depends_on:
+      - elasticsearch
+    networks:
+      - gsg
+
   mysql:
-    image: mysql:8.0
-    container_name: cafe-mysql
+    image: mysql:latest
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: gsg              # 생성할 기본 데이터베이스
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: '%'
     ports:
       - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: cafe_db
-      MYSQL_USER: cafe_user
-      MYSQL_PASSWORD: your_password
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql        # 데이터 영속화
+    networks:
+      - gsg
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 10s
-      retries: 3
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data                # Redis 데이터 저장
+    networks:
+      - gsg
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
-  mysql-data:
+  mysql_data:
+  redis_data:
+
+networks:
+  gsg:
+    driver: bridge  # 기본 브릿지 네트워크

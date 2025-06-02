@@ -168,17 +168,17 @@ def crawl_and_save_single_cafe(cafe_id):
         cursor = conn.cursor()
         cursor.execute("SELECT x, y FROM cafe_ids WHERE id = %s", (cafe_id,))
         loc_result = cursor.fetchone()
-        x = loc_result["x"] if loc_result else None
-        y = loc_result["y"] if loc_result else None
+        lon = loc_result["x"] if loc_result else None
+        lat = loc_result["y"] if loc_result else None
 
         # 카페 정보 DB에 저장 (중복 시 업데이트)
         cursor.execute("""
-            INSERT INTO cafes (id, title, address, open_time, rate, rate_count, image_url, zipcode, phone_number, x, y)
+            INSERT INTO cafes (id, title, address, open_time, rate, rate_count, image_url, zipcode, phone_number, lat, lon)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE title=VALUES(title), address=VALUES(address), open_time=VALUES(open_time), rate=VALUES(rate),
             rate_count=VALUES(rate_count), image_url=VALUES(image_url), zipcode=VALUES(zipcode),
-            phone_number=VALUES(phone_number), x=VALUES(x), y=VALUES(y)
-        """, (cafe_id, name, address, open_time, rating, review_count, image_url, zipcode, phone, x, y))
+            phone_number=VALUES(phone_number), lat=VALUES(lat), lon=VALUES(lon)
+        """, (cafe_id, name, address, open_time, rating, review_count, image_url, zipcode, phone, lat, lon))
 
         # 후기 탭 클릭 및 후기 정보 수집
         try:
@@ -216,7 +216,7 @@ def crawl_and_save_single_cafe(cafe_id):
                 except:
                     continue
                 cursor.execute("""
-                    INSERT INTO reviews (cafe_id, content, rating)
+                    INSERT INTO kakao_reviews (cafe_id, content, rating)
                     VALUES (%s, %s, %s)
                 """, (cafe_id, content, star))
             except:
@@ -225,7 +225,7 @@ def crawl_and_save_single_cafe(cafe_id):
         # 메뉴 정보 DB에 저장
         for m in menus:
             cursor.execute("""
-                INSERT INTO menu (cafe_id, name, price, menu_image_url)
+                INSERT INTO menus (cafe_id, name, price, menu_image_url)
                 VALUES (%s, %s, %s, %s)
             """, m)
 
@@ -253,11 +253,11 @@ def crawl_all_cafes():
     # 기존 데이터 삭제 및 초기화
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM reviews")
-    cursor.execute("DELETE FROM menu")
+    cursor.execute("DELETE FROM kakao_reviews")
+    cursor.execute("DELETE FROM menus")
     cursor.execute("DELETE FROM cafes")
-    cursor.execute("ALTER TABLE reviews AUTO_INCREMENT = 1")
-    cursor.execute("ALTER TABLE menu AUTO_INCREMENT = 1")
+    cursor.execute("ALTER TABLE kakao_reviews AUTO_INCREMENT = 1")
+    cursor.execute("ALTER TABLE menus AUTO_INCREMENT = 1")
     cursor.execute("ALTER TABLE cafes AUTO_INCREMENT = 1")
     conn.commit()
 

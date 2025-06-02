@@ -16,18 +16,18 @@ def reset_cluster_tables():
     conn = get_connection()
     with conn.cursor() as cursor:
         cursor.execute("DELETE FROM clustered_keywords")
-        cursor.execute("DELETE FROM cluster_summaries")
+        cursor.execute("DELETE FROM keywords")
         cursor.execute("ALTER TABLE clustered_keywords AUTO_INCREMENT = 1")
-        cursor.execute("ALTER TABLE cluster_summaries AUTO_INCREMENT = 1")
+        cursor.execute("ALTER TABLE keywords AUTO_INCREMENT = 1")
     conn.commit()
     conn.close()
 
 
 def fetch_keywords_grouped_by_cafe():
-    # 데이터베이스에서 카페별 키워드 조회
+    # 데이터베이스에서 카페별 키워드(extracted_keywords) 조회
     conn = get_connection()
     with conn.cursor() as cursor:
-        cursor.execute("SELECT cafe_id, keyword FROM keywords")
+        cursor.execute("SELECT cafe_id, keyword FROM extracted_keywords")
         results = cursor.fetchall()
     conn.close()
 
@@ -101,7 +101,7 @@ def extract_representative_keywords(cafe_id, cluster_labels, keywords, embedding
 
 
 def save_cluster_summary(representative_data, cafe_id, cluster_labels, keywords):
-    # 각 (cafe_id, cluster_id)별 키워드 등장 횟수 계산 및 요약 저장
+    # 각 (cafe_id, cluster_id)별 키워드 등장 횟수 계산
     cluster_keyword_count = defaultdict(int)
     for kw, label in zip(keywords, cluster_labels):
         if label != -1:
@@ -110,10 +110,11 @@ def save_cluster_summary(representative_data, cafe_id, cluster_labels, keywords)
     conn = get_connection()
     with conn.cursor() as cursor:
         for cafe_id, cluster_id, rep_keyword, _ in representative_data:
-            count = cluster_keyword_count[(cafe_id, cluster_id)]
+            total_count = cluster_keyword_count[(cafe_id, cluster_id)]
+            # Insert only into keywords table, removing use of cluster_id
             cursor.execute(
-                "INSERT INTO cluster_summaries (cafe_id, cluster_id, representative_keyword, keyword_count) VALUES (%s, %s, %s, %s)",
-                (cafe_id, cluster_id, rep_keyword, count)
+                "INSERT INTO keywords (cafe_id, keyword, count) VALUES (%s, %s, %s)",
+                (cafe_id, rep_keyword, total_count)
             )
         conn.commit()
     conn.close()
