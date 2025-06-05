@@ -14,9 +14,9 @@ app = FastAPI(
 )
 
 # 라우터 등록
-app.include_router(cafe_search.router, prefix="/cafe", tags=["Cafe Search"])
-app.include_router(cafe_detail.router, prefix="/cafe", tags=["Cafe Detail"])
-app.include_router(keyword_extract.router, prefix="/keywords", tags=["Keyword Extract"])
+app.include_router(cafe_search.router, prefix="/api/v1/cafe", tags=["Cafe Search"])
+app.include_router(cafe_detail.router, prefix="/api/v1/cafe", tags=["Cafe Detail"])
+app.include_router(keyword_extract.router, prefix="/api/v1/keywords", tags=["Keyword Extract"])
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
