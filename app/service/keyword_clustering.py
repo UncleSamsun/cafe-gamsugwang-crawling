@@ -16,9 +16,7 @@ def reset_cluster_tables():
     conn = get_connection()
     with conn.cursor() as cursor:
         cursor.execute("DELETE FROM clustered_keywords")
-        cursor.execute("DELETE FROM keywords")
         cursor.execute("ALTER TABLE clustered_keywords AUTO_INCREMENT = 1")
-        cursor.execute("ALTER TABLE keywords AUTO_INCREMENT = 1")
     conn.commit()
     conn.close()
 
@@ -120,7 +118,7 @@ def save_cluster_summary(representative_data, cafe_id, cluster_labels, keywords)
     conn.close()
 
 
-def cluster_keywords_per_cafe(min_cluster_size=2):
+def cluster_keywords_per_cafe(update_progress_callback=None, min_cluster_size=2):
     # 카페별 키워드 클러스터링 메인 함수
     print("✅ 클러스터링 시작")
     reset_cluster_tables()
@@ -131,6 +129,9 @@ def cluster_keywords_per_cafe(min_cluster_size=2):
 
     cafe_keywords_map = fetch_keywords_grouped_by_cafe()
     print(f"✅ 키워드 수집 완료 - 카페 수: {len(cafe_keywords_map)}")
+
+    total_cafes = len(cafe_keywords_map)
+    processed_cafes = 0
 
     # 모든 키워드를 수집하여 TF-IDF 벡터라이저 학습
     all_keywords = []
@@ -160,5 +161,13 @@ def cluster_keywords_per_cafe(min_cluster_size=2):
             representative_data = extract_representative_keywords(cafe_id, cluster_labels, keywords, embeddings, tfidf_scores_per_cafe)
             save_cluster_summary(representative_data, cafe_id, cluster_labels, keywords)
             print(f"✅ {cafe_id}: 클러스터링 완료")
+
+            processed_cafes += 1
+            if update_progress_callback:
+                percent = 50 + int(processed_cafes / total_cafes * 50)
+                update_progress_callback(percent, f"clustering_cafe_{processed_cafes}")
         except Exception as e:
             print(f"❌ {cafe_id} 처리 중 오류 발생: {str(e)}")
+
+    if update_progress_callback:
+        update_progress_callback(100, "clustering_completed")

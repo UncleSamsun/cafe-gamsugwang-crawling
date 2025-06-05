@@ -5,13 +5,18 @@
 
 import time
 import re
+import math
+import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service as ChromeService
+import os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from app.core.db import get_connection
+from app.core.redis_client import get_redis
 
 DEFAULT_WAIT = 5
 SHORT_WAIT = 3
@@ -24,7 +29,14 @@ def crawl_and_save_single_cafe(cafe_id):
     """
     options = Options()
     options.add_argument("--headless")
-    driver = webdriver.Chrome(options=options)
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-software-rasterizer")
+    # Specify Chromium binary location
+    options.binary_location = "/usr/bin/chromium"
+    service = ChromeService(executable_path="/usr/bin/chromedriver")
+    driver = webdriver.Chrome(service=service, options=options)
     try:
         url = f"https://place.map.kakao.com/{cafe_id}"
         driver.get(url)
@@ -244,7 +256,7 @@ def crawl_and_save_single_cafe(cafe_id):
         return False
 
 
-def crawl_all_cafes():
+def crawl_all_cafes(job_id: str, update_progress_callback):
     """
     데이터베이스에 저장된 모든 카페 ID를 조회하여,
     각 카페의 상세 정보를 크롤링하고 저장합니다.
@@ -255,9 +267,11 @@ def crawl_all_cafes():
     cursor = conn.cursor()
     cursor.execute("DELETE FROM kakao_reviews")
     cursor.execute("DELETE FROM menus")
+    cursor.execute("DELETE FROM keywords")
     cursor.execute("DELETE FROM cafes")
     cursor.execute("ALTER TABLE kakao_reviews AUTO_INCREMENT = 1")
     cursor.execute("ALTER TABLE menus AUTO_INCREMENT = 1")
+    cursor.execute("ALTER TABLE keywords AUTO_INCREMENT = 1")
     cursor.execute("ALTER TABLE cafes AUTO_INCREMENT = 1")
     conn.commit()
 
@@ -269,7 +283,10 @@ def crawl_all_cafes():
     cursor.close()
     conn.close()
 
-    print(f"총 {len(cafe_ids)}개의 카페 ID를 수집했습니다.")
+    total_ids = len(cafe_ids)
+    processed_count = 0
+
+    print(f"총 {total_ids}개의 카페 ID를 수집했습니다.")
 
     saved_count = 0
     failed_ids = []
@@ -280,6 +297,9 @@ def crawl_all_cafes():
         for future in as_completed(futures):
             cafe_id = futures[future]
             result = future.result()
+            processed_count += 1
+            percent = int(processed_count / total_ids * 100)
+            update_progress_callback(percent, f"detail_step_{processed_count}")
             if result:
                 saved_count += 1
             else:
@@ -293,15 +313,30 @@ def crawl_all_cafes():
             for future in as_completed(retry_futures):
                 cafe_id = retry_futures[future]
                 result = future.result()
+                processed_count += 1
+                percent = int(processed_count / total_ids * 100)
+                update_progress_callback(percent, f"detail_step_{processed_count}")
                 if result:
                     saved_count += 1
                     failed_ids.remove(cafe_id)
 
     elapsed_time = time.time() - start_time
     print(f"⏱ 크롤링 완료 - 소요 시간: {elapsed_time:.2f}초")
-    print(f"✅ 저장된 카페 수: {saved_count} / {len(cafe_ids)}")
+    print(f"✅ 저장된 카페 수: {saved_count} / {total_ids}")
     if failed_ids:
         print("❌ 실패한 카페 ID 목록:")
         print(", ".join(map(str, failed_ids)))
 
+    update_progress_callback(100, "completed")
     return {"crawled_cafes": saved_count, "failed_ids": failed_ids}
+
+
+async def cafe_detail_job(job_id: str, update_progress_callback: callable):
+    """
+    Background task wrapper to run crawl_all_cafes in a thread.
+    """
+    try:
+        await asyncio.to_thread(crawl_all_cafes, job_id, update_progress_callback)
+    except Exception as e:
+        # on error, let caller handle setting failure status
+        raise e

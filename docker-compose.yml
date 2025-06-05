@@ -53,6 +53,7 @@ services:
       retries: 5
       start_period: 20s
 
+
   redis:
     image: redis:latest
     container_name: redis
@@ -69,6 +70,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: "linux/amd64"
+    shm_size: '256mb'
+    container_name: fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - REDIS_HOST=host.docker.internal
+      - REDIS_PORT=6379
+      - DB_HOST=host.docker.internal
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - gsg
 
 volumes:
   mysql_data:

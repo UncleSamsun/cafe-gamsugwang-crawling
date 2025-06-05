@@ -172,11 +172,15 @@ def save_cafe_ids(grid_key: str, cafe_data: list[dict]):
     conn.close()
 
 
-def run_grid_crawling():
+def run_grid_crawling(job_id: str, update_progress_callback):
     """
     그리드 형태로 분할된 영역별로 카페 정보를 크롤링하고 저장합니다.
     환경변수에서 API 키를 읽어오며, 각 영역별로 API를 호출하여 데이터를 수집합니다.
-    
+
+    Args:
+        job_id (str): 작업 식별자
+        update_progress_callback (callable): 진행 상황 업데이트 콜백 함수
+
     Returns:
         dict: 저장된 고유 카페 ID 수를 포함하는 딕셔너리
     """
@@ -198,7 +202,14 @@ def run_grid_crawling():
     grid_rects = pd.read_csv("data/map/grid_jeju_rects_200m_filtered.csv")
     print(f"총 검색할 사각형 영역 수: {len(grid_rects)}")
 
+    total_steps = len(grid_rects)
+    current_step = 0
+
     for idx, row in grid_rects.iterrows():
+        current_step += 1
+        percent = int(current_step / total_steps * 100)
+        update_progress_callback(percent, f"grid_step_{current_step}")
+
         min_lat, min_lng = row["min_lat"], row["min_lng"]
         max_lat, max_lng = row["max_lat"], row["max_lng"]
         grid_key = f"{min_lat:.6f},{min_lng:.6f},{max_lat:.6f},{max_lng:.6f}"

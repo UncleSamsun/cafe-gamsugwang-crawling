@@ -16,7 +16,7 @@ Kiwi 형태소 분석기와 KeyBERT, SBERT 모델을 활용하여 리뷰 내용�
 각 카페별로 키워드 빈도를 집계하여 관리합니다.
 """
 
-def extract_all_keywords():
+def extract_all_keywords(update_progress_callback=None):
     """
     모든 카페의 리뷰 데이터를 분석하여 키워드를 추출하고 데이터베이스에 저장하는 함수입니다.
 
@@ -42,6 +42,8 @@ def extract_all_keywords():
             cursor.execute("SELECT id FROM cafes")
             cafes = cursor.fetchall()
             logger.info(f"{len(cafes)}개의 카페에 대해 키워드 추출을 시작합니다.")
+            total_cafes = len(cafes)
+            processed_cafes = 0
 
             count_total = 0
             # Kiwi 형태소 분석기 초기화
@@ -122,8 +124,14 @@ def extract_all_keywords():
                                 INSERT INTO extracted_keywords (cafe_id, keyword, count) VALUES (%s, %s, 1)
                             """, (cafe_id, keyword))
 
+                processed_cafes += 1
+                if update_progress_callback:
+                    percent = int(processed_cafes / total_cafes * 50)
+                    update_progress_callback(percent, f"extracting_cafe_{processed_cafes}")
                 count_total += 1
 
+            if update_progress_callback:
+                update_progress_callback(50, "extraction_completed")
             conn.commit()
             logger.info(f"{count_total}개의 카페에 대해 키워드 추출을 완료했습니다.")
             return count_total
