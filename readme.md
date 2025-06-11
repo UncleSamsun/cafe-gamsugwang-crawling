@@ -63,7 +63,7 @@ cafe-gamsugwang-crawling/
 | kakao_reviews       | 크롤링된 리뷰                |
 | extracted_keywords  | 리뷰에서 추출된 키워드       |
 | clustered_keywords  | 클러스터 내 키워드 + count   |
-| keywords            | 클러스터 대표 키워드 + 총 count (기존 cluster_summaries) |
+| keywords            | 클러스터 대표 키워드 + 총 count |
 
 ---
 
@@ -102,5 +102,3 @@ docker-compose up -d
 ```
 
 ---
-
-문의 사항은 댓글 또는 이슈로 등록해주세요 😊
